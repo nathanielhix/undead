@@ -1,2 +1,2 @@
 # undead
-A tool for reporting network statuses
+A tool for reporting statuses of network devices in bulk.
