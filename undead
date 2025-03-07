@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
 
 from argparse import ArgumentParser
+from json import dumps
 from platform import system
 from shutil import which
 from subprocess import run, PIPE
 from sys import exit, argv
 from typing import Union
+
+
+class NetObj:
+    def __init__(self, hostname):
+        self.hostname = hostname
+        self.ip_addr = None
+        self.status_icmp = None
+        self.returncode_icmp = None
+        self.net_ib = None
+        self.net_oob = None
+        self.outs = None
+        self.errs = None
 
 
 def conf_args():
@@ -21,7 +34,7 @@ def conf_args():
         '-H',
         '--host-file',
         type=str,
-        help='A newline separated list of DNS-resolvable hostnames.',
+        help='A newline separated file of DNS-resolvable hostnames.',
     )
     req_args.add_argument(
         '-n',
@@ -92,19 +105,22 @@ def get_os() -> str:
     return system()
 
 
-def check_ping(addr: str, cmd: list[str], os: str) -> (bool, int, str):
-    # Return true or false.
-    # Extra parsing required for Windows.
-    cmd.append(addr)
+def check_ping(node: NetObj, cmd: list[str], os: str) -> NetObj:
+    # Ping check a NetObj.
+    cmd.append(node.hostname)
+
     result = run(cmd, capture_output=True, encoding='UTF-8')
-    errs = result.stderr.strip()
+    node.outs = result.stdout.strip()
+    node.errs = result.stderr.strip()
 
-    if result.returncode != 0 or 'Destination Host Unreachable' in errs:
-        return False, result.returncode, errs
+    if result.returncode != 0 or 'host unreachable' in node.errs.lower():
+        node.status_icmp = 'unreachable'
+    else:
+        node.status_icmp = 'reachable'
 
-    return True, result.returncode, errs
+    node.returncode_icmp = result.returncode
 
-
+    return node
 
 
 def main():
@@ -118,6 +134,9 @@ def main():
         print_fmt(f'DEBUG: No nodes specified. Argparse should have prevented this.', 'debug')
         exit(200)
 
+    # Build a list of nodes as NetObj.
+    nodes = [NetObj(node) for node in nodes]
+
     if args.icmp:
         ping = get_prog_path('ping')
         os = get_os()
@@ -130,7 +149,8 @@ def main():
             cmd = [ping, '-c', '1', '-W', '1']
 
         for node in nodes:
-            print(check_ping(node, cmd, os))
+            check_ping(node, cmd, os)
+            print(dumps(node.__dict__, indent=2))
 
 
 if __name__ == '__main__':
