@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+from argparse import ArgumentParser
+from sys import exit, argv
+from typing import Union
+
+
+def conf_args():
+    parser = ArgumentParser()
+    req_args = parser.add_mutually_exclusive_group(required=True)
+    opt_args = parser.add_argument_group(title="Optional Arguments")
+
+    req_args.add_argument(
+        '-H',
+        '--host-file',
+        type=str,
+        help='A newline separated list of DNS-resolvable hostnames.',
+    )
+    req_args.add_argument(
+        '-n',
+        '--node',
+        nargs='+',
+        help='A space separate list of DNS-resolvable hostnames.',
+    )
+
+    opt_args.add_argument(
+        '-i',
+        '--icmp',
+        action='store_true',
+        help='ICMP Ping targets. Calls system ping utility.',
+    )
+    opt_args.add_argument(
+        '-t',
+        '--tcp',
+        type=int,
+        nargs=1,
+        help='TCP ping targets. Accepts a numeric port.',
+    )
+    opt_args.add_argument(
+        '-m',
+        '--monitor',
+        type=int,
+        const=10,
+        nargs='?',
+        help='Monitor mode. Accepts a polling interval in seconds. Defaults to 10',
+    )
+
+    return parser.parse_args()
+
+
+def print_fmt(msg: str, level: str) -> str:
+    colors = {
+        'debug': '\033[0;36m',
+        'info': '\033[0;32m',
+        'warn': '\033[1;33m',
+        'error': '\033[1;31m',
+        'fatal': '\033[0;31m',
+        'reset': '\033[0m',
+    }
+
+    if level in colors.keys():
+        print(f'{colors[level]}{msg}{colors["reset"]}')
+    else:
+        print(msg)
+
+
+def read_file(file: str) -> list[str]:
+    try:
+        with open(file, 'r') as f:
+            return f.read().splitlines()
+    except Exception as e:
+        print_fmt(f'Failed to read from {e.filename}: {e.strerror}', 'fatal')
+        exit(e.errno)
+
+
+def main():
+    args = conf_args()
+
+    if args.node:
+        nodes = args.node
+
+    if args.host_file:
+        nodes = read_file(args.host_file)
+
+    print_fmt(f'DEBUG: nodes list: {nodes}', 'debug')
+    print_fmt(f'DEBUG: --monitor value: {args.monitor}', 'debug')
+
+
+if __name__ == '__main__':
+    exit(main())
