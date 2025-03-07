@@ -5,7 +5,7 @@ from json import dumps
 from platform import system
 from shutil import which
 from subprocess import run, PIPE
-from sys import exit, argv
+from sys import argv, exit, stderr
 from typing import Union
 
 
@@ -80,7 +80,7 @@ def print_fmt(msg: str, level: str) -> str:
     }
 
     if level in colors.keys():
-        print(f'{colors[level]}{msg}{colors["reset"]}')
+        print(f'{colors[level]}{msg}{colors["reset"]}', file=stderr)
     else:
         print(msg)
 
@@ -105,9 +105,9 @@ def get_os() -> str:
     return system()
 
 
-def check_ping(node: NetObj, cmd: list[str], os: str) -> NetObj:
+def check_ping(node: NetObj, base_cmd: list[str], os: str) -> NetObj:
     # Ping check a NetObj.
-    cmd.append(node.hostname)
+    cmd = base_cmd + [node.hostname]
 
     result = run(cmd, capture_output=True, encoding='UTF-8')
     node.outs = result.stdout.strip()
@@ -142,14 +142,14 @@ def main():
         os = get_os()
 
         if os in ['Darwin', 'Linux']:
-            cmd = [ping, '-c', '1', '-W', '1']
+            base_cmd = [ping, '-c', '1', '-W', '1']
         elif os == 'Windows':
-            cmd = [ping, '/n', '1', '/w', '1000']
+            base_cmd = [ping, '/n', '1', '/w', '1000']
         else:
-            cmd = [ping, '-c', '1', '-W', '1']
+            base_cmd = [ping, '-c', '1', '-W', '1']
 
         for node in nodes:
-            check_ping(node, cmd, os)
+            check_ping(node, base_cmd, os)
             print(dumps(node.__dict__, indent=2))
 
 
