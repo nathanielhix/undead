@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 
 from argparse import ArgumentParser
+from platform import system
+from shutil import which
+from subprocess import run, PIPE
 from sys import exit, argv
 from typing import Union
 
 
 def conf_args():
     parser = ArgumentParser()
+
+    # Required, and mutually exclusive, arguments.
     req_args = parser.add_mutually_exclusive_group(required=True)
+
+    # Optional arguments.
     opt_args = parser.add_argument_group(title="Optional Arguments")
 
     req_args.add_argument(
@@ -42,13 +49,14 @@ def conf_args():
         type=int,
         const=10,
         nargs='?',
-        help='Monitor mode. Accepts a polling interval in seconds. Defaults to 10',
+        help='Monitor mode with a polling interval in seconds. Defaults to 10.',
     )
 
     return parser.parse_args()
 
 
 def print_fmt(msg: str, level: str) -> str:
+    # Print an ANSI color wrapped string.
     colors = {
         'debug': '\033[0;36m',
         'info': '\033[0;32m',
@@ -65,6 +73,7 @@ def print_fmt(msg: str, level: str) -> str:
 
 
 def read_file(file: str) -> list[str]:
+    # Read a file. Return a list of strings.
     try:
         with open(file, 'r') as f:
             return f.read().splitlines()
@@ -73,17 +82,55 @@ def read_file(file: str) -> list[str]:
         exit(e.errno)
 
 
+def get_prog_path(prog: str) -> str:
+    # Return an absolute path to a script or binary.
+    return which(prog)
+
+
+def get_os() -> str:
+    # Return the OS family.
+    return system()
+
+
+def check_ping(addr: str, cmd: list[str], os: str) -> (bool, int, str):
+    # Return true or false.
+    # Extra parsing required for Windows.
+    cmd.append(addr)
+    result = run(cmd, capture_output=True, encoding='UTF-8')
+    errs = result.stderr.strip()
+
+    if result.returncode != 0 or 'Destination Host Unreachable' in errs:
+        return False, result.returncode, errs
+
+    return True, result.returncode, errs
+
+
+
+
 def main():
     args = conf_args()
 
     if args.node:
         nodes = args.node
-
-    if args.host_file:
+    elif args.host_file:
         nodes = read_file(args.host_file)
+    else:
+        print_fmt(f'DEBUG: No nodes specified. Argparse should have prevented this.', 'debug')
+        exit(200)
 
-    print_fmt(f'DEBUG: nodes list: {nodes}', 'debug')
-    print_fmt(f'DEBUG: --monitor value: {args.monitor}', 'debug')
+    if args.icmp:
+        ping = get_prog_path('ping')
+        os = get_os()
+
+        if os in ['Darwin', 'Linux']:
+            cmd = [ping, '-c', '1', '-W', '1']
+        elif os == 'Windows':
+            cmd = [ping, '/n', '1', '/w', '1000']
+        else:
+            cmd = [ping, '-c', '1', '-W', '1']
+
+        for node in nodes:
+            print(check_ping(node, cmd, os))
 
 
 if __name__ == '__main__':
