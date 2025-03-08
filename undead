@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-import concurrent.futures
 from argparse import ArgumentParser
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from json import dumps
 from multiprocessing import cpu_count
 from platform import system
 from shutil import which
 from subprocess import run, PIPE
 from sys import argv, exit, stderr
-from typing import Union
+from typing import Any, Union
 
 
 class NetObj:
@@ -134,19 +135,17 @@ def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
     return node
 
 
-def process_list(lst, func, procs, *args):
+def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> list:
     # Concurrently run a function on a list, using ThreadPoolExecutor.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=procs) as executor:
+    with ThreadPoolExecutor(max_workers=procs) as executor:
         future_to_item = {executor.submit(func, item, args): item for item in lst}
-        for future in concurrent.futures.as_completed(future_to_item):
+        for future in as_completed(future_to_item):
             item = future_to_item[future]
 
             try:
                 data = future.result()
             except Exception as e:
                 print('%r generated an exception: %s' % (item, e))
-            #else:
-            #    print('%r page is %d bytes' % (item, len(data.__dict__)))
 
     return lst
 
