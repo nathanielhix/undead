@@ -18,8 +18,8 @@ class NetObj:
     def __init__(self, hostname):
         self.hostname = hostname
         self.ip_addr = None
-        self.status_icmp = None
-        self.returncode_icmp = None
+        self.status = None
+        self.return_code = None
         self.net_ib = None
         self.net_oob = None
         self.outs = None
@@ -34,6 +34,9 @@ def conf_args():
 
     # Optional arguments.
     opt_args = parser.add_argument_group(title="Optional Arguments")
+
+    # Test arguments.
+    tst_args = parser.add_mutually_exclusive_group(required=True)
 
     # Format arguments.
     fmt_args = parser.add_argument_group(title="Format Arguments")
@@ -52,19 +55,20 @@ def conf_args():
         help='A space separate list of DNS-resolvable hostnames.',
     )
 
-    opt_args.add_argument(
+    tst_args.add_argument(
         '-i',
         '--icmp',
         action='store_true',
         help='ICMP Ping targets. Calls system ping utility.',
     )
-    opt_args.add_argument(
+    tst_args.add_argument(
         '-t',
         '--tcp',
         type=int,
         nargs=1,
         help='TCP ping targets. Accepts a numeric port.',
     )
+
     opt_args.add_argument(
         '-m',
         '--monitor',
@@ -138,11 +142,11 @@ def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
     node.errs = result.stderr.strip()
 
     if result.returncode != 0 or 'host unreachable' in node.errs.lower():
-        node.status_icmp = 'unreachable'
+        node.status = 'unreachable'
     else:
-        node.status_icmp = 'reachable'
+        node.status = 'reachable'
 
-    node.returncode_icmp = result.returncode
+    node.return_code = result.returncode
 
     return node
 
@@ -201,19 +205,21 @@ def main():
         # Ping nodes.
         nodes = process_list(nodes, check_ping, cores, base_cmd)
 
-    # Write results to a file.
+    # Write results, or print.
     now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     f_name = f'undead_report_{now}'
 
+    # Print only these fields. Applies to CSV and stdout.
+    headers = [
+        'hostname',
+        'ip_addr',
+        'status',
+        'return_code',
+        'errs'
+    ]
+
     if args.output_format == 'csv':
         f_name = f_name + f'.{args.output_format}'
-        headers = [
-            'hostname',
-            'ip_addr',
-            'status_icmp',
-            'returncode_icmp',
-            'errs'
-        ]
 
         with open(f_name, 'w+')as f:
             writer = DictWriter(f, fieldnames = headers)
@@ -224,6 +230,12 @@ def main():
                 }
                 for node in nodes
             )
+    else:
+        width = len(max([node.hostname for node in nodes], key=len)) + 5
+
+        print(''.join(h.ljust(width) for h in headers))
+        for node in nodes:
+            print(''.join([str(v).ljust(width) for k, v in node.__dict__.items() if k in headers]))
 
 
 if __name__ == '__main__':
