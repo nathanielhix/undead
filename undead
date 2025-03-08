@@ -3,6 +3,8 @@
 from argparse import ArgumentParser
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from csv import DictWriter
+from datetime import datetime
 from json import dumps
 from multiprocessing import cpu_count
 from platform import system
@@ -32,6 +34,9 @@ def conf_args():
 
     # Optional arguments.
     opt_args = parser.add_argument_group(title="Optional Arguments")
+
+    # Format arguments.
+    fmt_args = parser.add_argument_group(title="Format Arguments")
 
 
     req_args.add_argument(
@@ -67,6 +72,13 @@ def conf_args():
         const=10,
         nargs='?',
         help='Monitor mode with a polling interval in seconds. Defaults to 10.',
+    )
+
+    fmt_args.add_argument(
+        '-o',
+        '--output-format',
+        choices=['csv', 'json'],
+        help='Write results to a file in CSV or JSON.'
     )
 
     return parser.parse_args()
@@ -179,10 +191,32 @@ def main():
         else:
             base_cmd = [ping, '-c', '1', '-W', '1']
 
+        # Ping nodes.
         nodes = process_list(nodes, check_ping, cores, base_cmd)
 
-        for node in nodes:
-            print(dumps(node.__dict__, indent=2))
+    # Write results to a file.
+    now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    f_name = f'undead_report_{now}'
+
+    if args.output_format == 'csv':
+        f_name = f_name + f'.{args.output_format}'
+        headers = [
+            'hostname',
+            'ip_addr',
+            'status_icmp',
+            'returncode_icmp',
+            'errs'
+        ]
+
+        with open(f_name, 'w+')as f:
+            writer = DictWriter(f, fieldnames = headers)
+            writer.writeheader()
+            writer.writerows(
+                {
+                    k:v for k, v in node.__dict__.items() if k in headers
+                }
+                for node in nodes
+            )
 
 
 if __name__ == '__main__':
