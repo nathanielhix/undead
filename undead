@@ -5,6 +5,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from csv import DictWriter
 from datetime import datetime
+from ipaddress import ip_address, ip_network
 from json import dumps
 from multiprocessing import cpu_count
 from platform import system
@@ -130,33 +131,48 @@ def get_cores() -> int:
     # Return the number of CPU cores.
     return cpu_count()
 
+
 def get_ip(node: NetObj) -> NetObj:
     # Perform a DNS lookup of a NetObj using the host DNS facility.
-    try:
-        node.ip_addr = getaddrinfo(node.hostname, 80, family=AF_INET)[0][-1][0]
-    except gaierror as e:
-        node.ip_addr = f'{e.errno}: {e.strerror}'
+    if not check_ip(node.hostname):
+        try:
+            node.ip_addr = getaddrinfo(node.hostname, 80, family=AF_INET)[0][-1][0]
+        except gaierror as e:
+            node.errs = f'{e.errno}: {e.strerror}'
+    else:
+        node.ip_addr = node.hostname
 
     return node
 
 
+def check_ip(ip_addr: str) -> bool:
+    try:
+        ip_address(ip_addr)
+    except ValueError:
+        return False
+
+    return True
 
 
 def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
     # Ping check a NetObj.
+    if node.ip_addr is None:
+        node.status = 'unknown'
+        return node
+
     if type(base_cmd) is tuple:
         base_cmd = base_cmd[0]
 
-    cmd = base_cmd + [node.hostname]
+    cmd = base_cmd + [node.ip_addr]
 
     result = run(cmd, capture_output=True, encoding='UTF-8')
     node.outs = result.stdout.strip()
     node.errs = result.stderr.strip()
 
     if result.returncode != 0 or 'host unreachable' in node.errs.lower():
-        node.status = 'undead'
-    else:
         node.status = 'dead'
+    else:
+        node.status = 'undead'
 
     node.return_code = result.returncode
 
