@@ -184,7 +184,7 @@ def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> 
 
 def main():
     args = conf_args()
-    cores = get_cores()
+    def_cores = get_cores()
 
     if args.node:
         nodes = args.node
@@ -198,12 +198,13 @@ def main():
     nodes = [NetObj(node) for node in nodes]
 
     # Get node IP addresses.
+    cores = def_cores * 20
     nodes = process_list(nodes, get_ip, cores)
 
     if args.icmp:
         ping = get_prog_path('ping')
         os = get_os()
-        cores_icmp = cores * 6
+        cores = def_cores * 20
 
         # Darwin and FreeBSD timeout is measured in milliseconds.
         # NetBSD doesn't support timeout, but does support deadline.
@@ -220,7 +221,7 @@ def main():
             base_cmd = [ping, '-c', '1', '-W', '1']
 
         # Ping nodes.
-        nodes = process_list(nodes, check_ping, cores_icmp, base_cmd)
+        nodes = process_list(nodes, check_ping, cores, base_cmd)
 
     # Write results, or print.
     now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
