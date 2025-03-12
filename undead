@@ -8,6 +8,7 @@ from datetime import datetime
 from json import dumps
 from multiprocessing import cpu_count
 from platform import system
+from socket import AF_INET, gaierror, getaddrinfo
 from shutil import which
 from subprocess import run, PIPE
 from sys import argv, exit, stderr
@@ -124,10 +125,32 @@ def get_os() -> str:
     # Return the OS family.
     return system()
 
+def dns_lookup(node: NetObj) -> NetObj:
+    # Perform a DNS lookup.
+    try:
+        result = getaddrinfo(node.hostname, 53)
+    except Exception as e:
+        node.errs = e
+    else:
+        node.ip_addr = result[0][-1][0]
+
+    return node
+
 
 def get_cores() -> int:
     # Return the number of CPU cores.
     return cpu_count()
+
+def get_ip(node: NetObj) -> NetObj:
+    # Perform a DNS lookup of a NetObj using the host DNS facility.
+    try:
+        node.ip_addr = getaddrinfo(node.hostname, 80, family=AF_INET)[0][-1][0]
+    except gaierror as e:
+        node.ip_addr = f'{e.errno}: {e.strerror}'
+
+    return node
+
+
 
 
 def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
@@ -142,9 +165,9 @@ def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
     node.errs = result.stderr.strip()
 
     if result.returncode != 0 or 'host unreachable' in node.errs.lower():
-        node.status = 'unreachable'
+        node.status = 'undead'
     else:
-        node.status = 'reachable'
+        node.status = 'dead'
 
     node.return_code = result.returncode
 
@@ -154,7 +177,11 @@ def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
 def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> list:
     # Concurrently run a function on a list, using ThreadPoolExecutor.
     with ThreadPoolExecutor(max_workers=procs) as executor:
-        future_to_item = {executor.submit(func, item, args): item for item in lst}
+        if args:
+            future_to_item = {executor.submit(func, item, args): item for item in lst}
+        else:
+            future_to_item = {executor.submit(func, item): item for item in lst}
+
         for future in as_completed(future_to_item):
             item = future_to_item[future]
 
@@ -168,6 +195,7 @@ def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> 
 
 def main():
     args = conf_args()
+    cores = get_cores()
 
     if args.node:
         nodes = args.node
@@ -180,13 +208,13 @@ def main():
     # Build a list of nodes as NetObj.
     nodes = [NetObj(node) for node in nodes]
 
+    # Get node IP addresses.
+    nodes = process_list(nodes, get_ip, cores)
+
     if args.icmp:
         ping = get_prog_path('ping')
         os = get_os()
-        cores = get_cores()
-
-        # Performance test.
-        cores = cores * 6
+        cores_icmp = cores * 6
 
         # Darwin and FreeBSD timeout is measured in milliseconds.
         # NetBSD doesn't support timeout, but does support deadline.
@@ -203,7 +231,7 @@ def main():
             base_cmd = [ping, '-c', '1', '-W', '1']
 
         # Ping nodes.
-        nodes = process_list(nodes, check_ping, cores, base_cmd)
+        nodes = process_list(nodes, check_ping, cores_icmp, base_cmd)
 
     # Write results, or print.
     now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
