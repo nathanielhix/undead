@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from csv import DictWriter
 from datetime import datetime
 from ipaddress import ip_address, ip_network
-from json import dumps
+from json import dump
 from multiprocessing import cpu_count
 from platform import system
 from socket import AF_INET, gaierror, getaddrinfo
@@ -83,7 +83,8 @@ def conf_args():
     fmt_args.add_argument(
         '-o',
         '--output-format',
-        choices=['csv', 'json'],
+        default='stdout',
+        choices=['csv', 'json', 'stdout'],
         help='Write results to a file in CSV or JSON.'
     )
 
@@ -198,6 +199,33 @@ def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> 
     return lst
 
 
+def write_output(nodes: list, fmt_args: dict) -> str:
+    if fmt_args['fmt'].lower() == 'csv':
+        f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
+
+        with open(f_name, 'w+') as f:
+            writer = DictWriter(f, fieldnames = fmt_args['headers'])
+            writer.writeheader()
+            writer.writerows(
+                {
+                    k:v for k, v in node.__dict__.items() if k in fmt_args['headers']
+                }
+                for node in nodes
+            )
+    elif fmt_args['fmt'].lower() == 'json':
+        f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
+        data = {'hosts': [node.__dict__ for node in nodes]}
+
+        with open(f_name, 'w+') as f:
+            dump(data, f)
+    else:
+        width = len(max([node.hostname for node in nodes], key=len)) + 5
+
+        print(''.join(h.ljust(width) for h in fmt_args['headers']))
+        for node in nodes:
+            print(''.join([str(v).ljust(width) for k, v in node.__dict__.items() if k in fmt_args['headers']]))
+
+
 def main():
     args = conf_args()
     def_cores = get_cores()
@@ -224,8 +252,7 @@ def main():
 
         # Darwin and FreeBSD timeout is measured in milliseconds.
         # NetBSD doesn't support timeout, but does support deadline.
-        # OpenBSD doesn't support deadline, but does support maxwait.
-        # Windows flags are different, and timeout is measured in milliseconds.
+
         # Linux usually measures timeout in seconds.
         if os in ['Darwin', 'FreeBSD']:
             base_cmd = [ping, '-c', '1', '-W', '1000']
@@ -240,36 +267,19 @@ def main():
         nodes = process_list(nodes, check_ping, cores, base_cmd)
 
     # Write results, or print.
-    now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    f_name = f'undead_report_{now}'
+    fmt_args = {
+        'f_name': f'undead_report_{datetime.now().strftime("%Y-%m-%d_%H%M%S")}',
+        'headers': [
+            'hostname',
+            'ip_addr',
+            'status',
+            'return_code',
+            'errs'
+            ],
+        'fmt': args.output_format,
+    }
 
-    # Print only these fields. Applies to CSV and stdout.
-    headers = [
-        'hostname',
-        'ip_addr',
-        'status',
-        'return_code',
-        'errs'
-    ]
-
-    if args.output_format == 'csv':
-        f_name = f_name + f'.{args.output_format}'
-
-        with open(f_name, 'w+')as f:
-            writer = DictWriter(f, fieldnames = headers)
-            writer.writeheader()
-            writer.writerows(
-                {
-                    k:v for k, v in node.__dict__.items() if k in headers
-                }
-                for node in nodes
-            )
-    else:
-        width = len(max([node.hostname for node in nodes], key=len)) + 5
-
-        print(''.join(h.ljust(width) for h in headers))
-        for node in nodes:
-            print(''.join([str(v).ljust(width) for k, v in node.__dict__.items() if k in headers]))
+    write_output(nodes, fmt_args)
 
 
 if __name__ == '__main__':
