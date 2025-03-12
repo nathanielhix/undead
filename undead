@@ -125,17 +125,6 @@ def get_os() -> str:
     # Return the OS family.
     return system()
 
-def dns_lookup(node: NetObj) -> NetObj:
-    # Perform a DNS lookup.
-    try:
-        result = getaddrinfo(node.hostname, 53)
-    except Exception as e:
-        node.errs = e
-    else:
-        node.ip_addr = result[0][-1][0]
-
-    return node
-
 
 def get_cores() -> int:
     # Return the number of CPU cores.
