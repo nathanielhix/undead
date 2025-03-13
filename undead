@@ -5,14 +5,14 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from csv import DictWriter
 from datetime import datetime
-from ipaddress import ip_address, ip_network
+from ipaddress import ip_address
 from json import dump
 from multiprocessing import cpu_count
 from platform import system
 from socket import AF_INET, gaierror, getaddrinfo
 from shutil import which
-from subprocess import run, PIPE
-from sys import argv, exit, stderr
+from subprocess import run
+from sys import exit, stderr
 from typing import Any, Union
 
 
@@ -42,7 +42,6 @@ def conf_args():
 
     # Format arguments.
     fmt_args = parser.add_argument_group(title="Format Arguments")
-
 
     req_args.add_argument(
         '-H',
@@ -204,11 +203,11 @@ def write_output(nodes: list, fmt_args: dict) -> str:
         f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
 
         with open(f_name, 'w+') as f:
-            writer = DictWriter(f, fieldnames = fmt_args['headers'])
+            writer = DictWriter(f, fieldnames=fmt_args['headers'])
             writer.writeheader()
             writer.writerows(
                 {
-                    k:v for k, v in node.__dict__.items() if k in fmt_args['headers']
+                    k: v for k, v in node.__dict__.items() if k in fmt_args['headers']
                 }
                 for node in nodes
             )
@@ -235,7 +234,7 @@ def main():
     elif args.host_file:
         nodes = read_file(args.host_file)
     else:
-        print_fmt(f'DEBUG: No nodes specified. Argparse should have prevented this.', 'debug')
+        print_fmt('DEBUG: No nodes specified. Argparse should have prevented this.', 'debug')
         exit(200)
 
     # Build a list of nodes as NetObj.
