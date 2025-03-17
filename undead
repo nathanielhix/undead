@@ -8,11 +8,13 @@ from datetime import datetime
 from ipaddress import ip_address
 from json import dump
 from multiprocessing import cpu_count
-from platform import system
+from os import system as osystem
+from platform import system as psystem
 from socket import AF_INET, gaierror, getaddrinfo
 from shutil import which
 from subprocess import run
 from sys import exit, stderr
+from time import sleep
 from typing import Any, Union
 
 
@@ -107,6 +109,11 @@ def print_fmt(msg: str, level: str) -> str:
         print(msg)
 
 
+def clear_screen():
+    # Clear the screen
+    osystem('cls||clear')
+
+
 def read_file(file: str) -> list[str]:
     # Read a file. Return a list of strings.
     try:
@@ -124,7 +131,7 @@ def get_prog_path(prog: str) -> str:
 
 def get_os() -> str:
     # Return the OS family.
-    return system()
+    return psystem()
 
 
 def get_cores() -> int:
@@ -244,6 +251,9 @@ def main():
     cores = def_cores * 20
     nodes = process_list(nodes, get_ip, cores)
 
+    # Dictionary of tests to run.
+    tests = {}
+
     if args.icmp:
         ping = get_prog_path('ping')
         os = get_os()
@@ -251,7 +261,6 @@ def main():
 
         # Darwin and FreeBSD timeout is measured in milliseconds.
         # NetBSD doesn't support timeout, but does support deadline.
-
         # Linux usually measures timeout in seconds.
         if os in ['Darwin', 'FreeBSD']:
             base_cmd = [ping, '-c', '1', '-W', '1000']
@@ -262,10 +271,12 @@ def main():
         else:
             base_cmd = [ping, '-c', '1', '-W', '1']
 
-        # Ping nodes.
-        nodes = process_list(nodes, check_ping, cores, base_cmd)
+        # Add test to tests.
+        tests = {
+            'ping': lambda: process_list(nodes, check_ping, cores, base_cmd)
+        }
 
-    # Write results, or print.
+    # Set format arguments.
     fmt_args = {
         'f_name': f'undead_report_{datetime.now().strftime("%Y-%m-%d_%H%M%S")}',
         'headers': [
@@ -277,6 +288,24 @@ def main():
             ],
         'fmt': args.output_format,
     }
+
+    # Run tests
+    if args.monitor:
+        fmt_args['fmt'] = 'stdout'
+        clear_screen()
+
+        try:
+            while True:
+                for test in tests.keys():
+                    nodes = tests[test]()
+
+                write_output(nodes, fmt_args)
+                print_fmt(f'\nSleeping {args.monitor} seconds...', 'info')
+                sleep(args.monitor)
+                clear_screen()
+        except KeyboardInterrupt:
+            clear_screen()
+            print_fmt('Caught KeyboardInterrupt. Quitting and writing results.\n', 'info')
 
     write_output(nodes, fmt_args)
 
