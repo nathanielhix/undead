@@ -306,6 +306,9 @@ def main():
         except KeyboardInterrupt:
             clear_screen()
             print_fmt('Caught KeyboardInterrupt. Quitting and writing results.\n', 'info')
+    else:
+        for test in tests.keys():
+            nodes = tests[test]()
 
     write_output(nodes, fmt_args)
 
