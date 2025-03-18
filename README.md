@@ -78,6 +78,7 @@ undead is still young, so there are quite a few known issues which haven't been 
 2. TCP ping isn't implemented yet.
 3. DNS resolution relies on the host system's DNS facilities, without the ability to specify another DNS server.
 4. Piping to `head` results in a `BrokenPipeError`.
+5. Failing to specify tests results in no tests running, but results written or printed.
 
 ### Windows
 1. Text is colored using ANSI escape sequences, which do not display properly.
