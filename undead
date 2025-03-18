@@ -30,6 +30,11 @@ class NetObj:
         self.errs = None
 
 
+# Global variables.
+sys_os = psystem()
+def_cores = cpu_count()
+
+
 def conf_args():
     parser = ArgumentParser()
 
@@ -94,6 +99,11 @@ def conf_args():
 
 def print_fmt(msg: str, level: str) -> str:
     # Print an ANSI color wrapped string.
+
+    # Enable ANSI escape sequence for Windows.
+    if sys_os == 'Windows':
+        osystem('')
+
     colors = {
         'debug': '\033[0;36m',
         'info': '\033[0;32m',
@@ -127,16 +137,6 @@ def read_file(file: str) -> list[str]:
 def get_prog_path(prog: str) -> str:
     # Return an absolute path to a script or binary.
     return which(prog)
-
-
-def get_os() -> str:
-    # Return the OS family.
-    return psystem()
-
-
-def get_cores() -> int:
-    # Return the number of CPU cores.
-    return cpu_count()
 
 
 def get_ip(node: NetObj) -> NetObj:
@@ -234,7 +234,6 @@ def write_output(nodes: list, fmt_args: dict) -> str:
 
 def main():
     args = conf_args()
-    def_cores = get_cores()
 
     if args.node:
         nodes = args.node
@@ -256,17 +255,16 @@ def main():
 
     if args.icmp:
         ping = get_prog_path('ping')
-        os = get_os()
         cores = def_cores * 20
 
         # Darwin and FreeBSD timeout is measured in milliseconds.
         # NetBSD doesn't support timeout, but does support deadline.
         # Linux usually measures timeout in seconds.
-        if os in ['Darwin', 'FreeBSD']:
+        if sys_os in ['Darwin', 'FreeBSD']:
             base_cmd = [ping, '-c', '1', '-W', '1000']
-        elif os in ['NetBSD', 'OpenBSD']:
+        elif sys_os in ['NetBSD', 'OpenBSD']:
             base_cmd = [ping, '-c', '1', '-w', '1']
-        elif os == 'Windows':
+        elif sys_os == 'Windows':
             base_cmd = [ping, '/n', '1', '/w', '1000']
         else:
             base_cmd = [ping, '-c', '1', '-W', '1']
