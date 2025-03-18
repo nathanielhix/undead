@@ -81,5 +81,5 @@ undead is still young, so there are quite a few known issues which haven't been 
 5. Failing to specify tests results in no tests running, but results written or printed.
 
 ### Windows
-1. Text is colored using ANSI escape sequences, which do not display properly.
+1. ~~Text is colored using ANSI escape sequences, which do not display properly.~~
 2. Arguments for ping delay much longer than their *NIX counterparts.
