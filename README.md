@@ -3,7 +3,7 @@ A parallelized tool for reporting statuses of network devices en masse.
 
 ## Why undead
 
-Ad-hoc monitoring of groups of servers or network devices is something that can be put together using a variety of existing tools, but undead provides a simple interface to perform temporary live monitoring, or report generation, and does it faster than most other existing tools. An entire /24 can be ICMP scanned in approximately 2.1 seconds, including the time it takes to print the table of results.
+Ad-hoc monitoring of groups of servers or network devices is something that can be put together using a variety of existing tools, but undead provides a simple interface to perform temporary live monitoring, or report generation, and does it faster than most other existing tools. An entire /24 can be ICMP scanned in approximately 2.1 seconds, including the time it takes to print the table of results. undead also supports report generation in CSV or JSON format.
 
 ## Usage
 ```
