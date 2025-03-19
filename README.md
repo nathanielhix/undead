@@ -74,6 +74,7 @@ undead is still young, so there are quite a few known issues which haven't been 
 ### General
 1. Reports printed to stdout are broken.
    - Text is not formatted to fit the terminal window.
+   - Text is colorized, but can overrun the right-most boundary of the table.
    - ~~There is no colorization, or other formatting of the text to visually distinguish dead from undead.~~
 2. TCP ping isn't implemented yet.
 3. DNS resolution relies on the host system's DNS facilities, without the ability to specify another DNS server.
