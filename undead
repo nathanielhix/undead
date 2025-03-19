@@ -204,7 +204,7 @@ def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> 
     return lst
 
 
-def write_output(nodes: list, fmt_args: dict) -> str:
+def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
     if fmt_args['fmt'].lower() == 'csv':
         f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
 
@@ -226,17 +226,41 @@ def write_output(nodes: list, fmt_args: dict) -> str:
     else:
         width = len(max([node.hostname for node in nodes], key=len)) + 5
 
-        print_fmt(f'{"".join(h.ljust(width) for h in fmt_args["headers"])}', 'back_bold_cyan')
+        # A list to store results. Add headers
+        results = []
+        results.append("".join(h.ljust(width) for h in fmt_args["headers"]))
+
+        # Append node results from each node to the list of results.
         for node in nodes:
-            if node.status == 'undead':
-                print_fmt(f'{"".join([str(v).ljust(width) for k, v in node.__dict__.items() if k in fmt_args["headers"]])}',
-                    'fore_std_green')
-            elif node.status == 'dead':
-                print_fmt(f'{"".join([str(v).ljust(width) for k, v in node.__dict__.items() if k in fmt_args["headers"]])}',
-                    'fore_std_red')
+            results.append("".join([str(v).ljust(width) for k, v in node.__dict__.items() if k in fmt_args["headers"]]))
+
+        # Get the length of the longest line.
+        line_len = len(max(results, key=len))
+
+        # Modify results to have uniform line lengths.
+        for index, line in enumerate(results):
+            if len(line) < line_len:
+                results[index] = ' ' + line + ' ' * (line_len - len(line) + 1)
             else:
-                print_fmt(f'{"".join([str(v).ljust(width) for k, v in node.__dict__.items() if k in fmt_args["headers"]])}',
-                    'fore_std_yellow')
+                results[index] = ' ' + line + ' '
+
+        # Print results.
+        for index, line in enumerate(results):
+            if index == 0:
+                print_fmt(f'{line}', 'back_bold_cyan')
+            elif ' undead' in line:
+                print_fmt(f'{line}', 'fore_std_green')
+            elif ' dead' in line:
+                print_fmt(f'{line}', 'fore_std_red')
+            else:
+                print_fmt(f'{line}', 'fore_std_yellow')
+
+        # Print the bottom border.
+        if mon_mode is False:
+            print_fmt(f'{" " * (line_len + 2)}', 'back_bold_cyan')
+        else:
+            # Return max line length for monitor mode.
+            return len(max(results, key=len))
 
 
 def main():
@@ -308,8 +332,9 @@ def main():
                 for test in tests.keys():
                     nodes = tests[test]()
 
-                write_output(nodes, fmt_args)
-                print_fmt(f'\nSleeping {args.monitor} seconds...', 'info')
+                max_len = write_output(nodes, fmt_args, True)
+                countdown = f'Sleeping {args.monitor} seconds…'
+                print_fmt(f' {countdown}{" " * (max_len - len(countdown) - 1)}', 'back_bold_cyan')
                 sleep(args.monitor)
                 clear_screen()
         except KeyboardInterrupt:
@@ -319,7 +344,7 @@ def main():
         for test in tests.keys():
             nodes = tests[test]()
 
-    write_output(nodes, fmt_args)
+    write_output(nodes, fmt_args, False)
 
 
 if __name__ == '__main__':
