@@ -100,20 +100,22 @@ def conf_args():
 def print_fmt(msg: str, level: str) -> str:
     # Print an ANSI color wrapped string.
     colors = {
-        'back_bold_cyan': '\033[1;46;37m',
-        'fore_std_green': '\033[0;40;32m',
-        'fore_std_red': '\033[0;40;31m',
-        'fore_std_yellow': '\033[0;40;93m',
-        'debug': '\033[0;36m',
-        'info': '\033[0;32m',
-        'warn': '\033[0;33m',
-        'error': '\033[0;31m',
-        'fatal': '\033[1;31m',
-        'reset': '\033[0m',
+        'back_bold_cyan': {'fmt': '\033[1;46;37m', 'fac': 'stdout'},
+        'fore_std_green': {'fmt': '\033[0;40;32m', 'fac': 'stdout'},
+        'fore_std_red': {'fmt': '\033[0;40;31m', 'fac': 'stdout'},
+        'fore_std_yellow': {'fmt': '\033[0;40;93m', 'fac': 'stdout'},
+        'debug': {'fmt': '\033[0;36m', 'fac': 'stderr'},
+        'info': {'fmt': '\033[0;32m', 'fac': 'stderr'},
+        'warn': {'fmt': '\033[0;33m', 'fac': 'stderr'},
+        'error': {'fmt': '\033[0;31m', 'fac': 'stderr'},
+        'fatal': {'fmt': '\033[1;31m', 'fac': 'stderr'},
+        'reset': {'fmt': '\033[0m', 'fac': 'stderr'},
     }
 
-    if level in colors.keys():
-        print(f'{colors[level]}{msg}{colors["reset"]}', file=stderr)
+    if level in colors.keys() and colors[level]['fac'] == 'stderr':
+        print(f'{colors[level]["fmt"]}{msg}{colors["reset"]["fmt"]}', file=stderr)
+    elif level in colors.keys() and colors[level]['fac'] == 'stdout':
+        print(f'{colors[level]["fmt"]}{msg}{colors["reset"]["fmt"]}')
     else:
         print(msg)
 
