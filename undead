@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import socket
 from argparse import ArgumentParser
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -10,10 +11,9 @@ from json import dump
 from multiprocessing import cpu_count
 from os import system as osystem
 from platform import system as psystem
-from socket import AF_INET, gaierror, getaddrinfo
 from shutil import which
 from subprocess import run
-from sys import exit, stderr
+from sys import argv, exit, stderr
 from time import sleep
 from typing import Any, Union
 
@@ -23,7 +23,9 @@ class NetObj:
         self.hostname = hostname
         self.ip_addr = None
         self.status = None
-        self.return_code = None
+        self.icmp_status = None
+        self.tcp_port = None
+        self.tcp_status = None
         self.net_ib = None
         self.net_oob = None
         self.outs = None
@@ -45,7 +47,7 @@ def conf_args():
     opt_args = parser.add_argument_group(title="Optional Arguments")
 
     # Test arguments.
-    tst_args = parser.add_mutually_exclusive_group(required=True)
+    tst_args = parser.add_argument_group("Test Arguments")
 
     # Format arguments.
     fmt_args = parser.add_argument_group(title="Format Arguments")
@@ -144,8 +146,8 @@ def get_ip(node: NetObj) -> NetObj:
     # Perform a DNS lookup of a NetObj using the host DNS facility.
     if not check_ip(node.hostname):
         try:
-            node.ip_addr = getaddrinfo(node.hostname, 80, family=AF_INET)[0][-1][0]
-        except gaierror as e:
+            node.ip_addr = socket.getaddrinfo(node.hostname, 80, family=socket.AF_INET)[0][-1][0]
+        except socket.gaierror as e:
             node.errs = f'{e.errno}: {e.strerror}'
     else:
         node.ip_addr = node.hostname
@@ -177,14 +179,53 @@ def check_ping(node: NetObj, base_cmd: list[str]) -> NetObj:
     node.outs = result.stdout.strip()
     node.errs = result.stderr.strip()
 
-    if result.returncode != 0 or 'host unreachable' in node.errs.lower():
-        node.status = 'dead'
+    # Windows return codes for ping may not be reliable across versions.
+    if sys_os == 'Windows' and 'TTL' not in result.stdout:
+        node.icmp_status = 'failure'
+    elif result.returncode != 0:
+        node.icmp_status = 'failure'
     else:
-        node.status = 'undead'
-
-    node.return_code = result.returncode
+        node.icmp_status = 'success'
 
     return node
+
+
+def check_tcp(node: NetObj, port: int) -> NetObj:
+    # Initiate a TCP connection to a single port.
+    if node.ip_addr is None:
+        node.status = 'unknown'
+        return node
+
+    if type(port) is tuple:
+        port = port[0][0]
+
+    ip_port = (node.ip_addr, port)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+
+    try:
+        sock.connect(ip_port)
+        node.tcp_status = 'success'
+    except Exception as e:
+        node.errs = e.strerror
+        node.tcp_status = 'failure'
+
+    sock.close()
+
+    return node
+
+
+def sus_status(nodes):
+    # Determine the dead or undead statuses of nodes.
+    for node in nodes:
+        if 'success' in [node.icmp_status, node.tcp_status]:
+            node.status = 'undead'
+        elif not any([node.icmp_status, node.tcp_status]):
+            node.status = 'unknown'
+        else:
+            node.status = 'dead'
+
+    return nodes
 
 
 def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> list:
@@ -267,6 +308,14 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
 
 def main():
     args = conf_args()
+    # Do not proceed if no tests specified.
+    if not any([args.icmp, args.tcp]):
+        print_fmt(
+            'One or more of the following tests must be specified:\n'
+            '[--icmp|-i, --tcp|-t]',
+            'fatal'
+        )
+        exit(2)
 
     # Enable ANSI escape sequence for Windows.
     if sys_os == 'Windows':
@@ -286,6 +335,19 @@ def main():
     # Get node IP addresses.
     cores = def_cores * 20
     nodes = process_list(nodes, get_ip, cores)
+
+    # Set format arguments.
+    fmt_args = {
+        'f_name': f'undead_report_{datetime.now().strftime("%Y-%m-%d_%H%M%S")}',
+        'headers': [
+            'hostname',
+            'ip_addr',
+            'status',
+            'icmp_status',
+            'errs'
+            ],
+        'fmt': args.output_format,
+    }
 
     # Dictionary of tests to run.
     tests = {}
@@ -307,22 +369,19 @@ def main():
             base_cmd = [ping, '-c', '1', '-W', '1']
 
         # Add test to tests.
-        tests = {
-            'ping': lambda: process_list(nodes, check_ping, cores, base_cmd)
-        }
+        tests['ping'] = lambda: process_list(nodes, check_ping, cores, base_cmd)
 
-    # Set format arguments.
-    fmt_args = {
-        'f_name': f'undead_report_{datetime.now().strftime("%Y-%m-%d_%H%M%S")}',
-        'headers': [
-            'hostname',
-            'ip_addr',
-            'status',
-            'return_code',
-            'errs'
-            ],
-        'fmt': args.output_format,
-    }
+    if args.tcp:
+        cores = def_cores * 20
+        for node in nodes:
+            node.tcp_port = args.tcp[0]
+
+        # Add test to tests.
+        tests['tcp'] = lambda: process_list(nodes, check_tcp, cores, args.tcp)
+
+        # Extend headers.
+        fmt_args['headers'].insert(-1, 'tcp_port')
+        fmt_args['headers'].insert(-1, 'tcp_status')
 
     # Run tests
     if args.monitor:
@@ -331,20 +390,32 @@ def main():
 
         try:
             while True:
+                # Reset statuses for all tests on all nodes.
+                for node in nodes:
+                    node.icmp_status = node.tcp_status = None
+
+                # Run tests.
                 for test in tests.keys():
                     nodes = tests[test]()
 
+                # Determine statuses of nodes.
+                nodes = sus_status(nodes)
+
+                # Sleep and print results.
                 max_len = write_output(nodes, fmt_args, True)
                 countdown = f'Sleeping {args.monitor} seconds…'
                 print_fmt(f' {countdown}{" " * (max_len - len(countdown) - 1)}', 'back_bold_cyan')
                 sleep(args.monitor)
                 clear_screen()
+
         except KeyboardInterrupt:
             clear_screen()
             print_fmt('Caught KeyboardInterrupt. Quitting and writing results.\n', 'info')
     else:
         for test in tests.keys():
             nodes = tests[test]()
+
+        nodes = sus_status(nodes)
 
     write_output(nodes, fmt_args, False)
 
