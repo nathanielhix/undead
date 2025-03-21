@@ -7,7 +7,7 @@ Ad-hoc monitoring of groups of servers or network devices is something that can 
 
 ## Usage
 ```
-usage: undead [-h] (-H HOST_FILE | -n NODE [NODE ...]) [-i] [-t TCP] [-m [MONITOR]] [-o {csv,json,stdout}]
+usage: undead [-h] (-H HOST_FILE | -n NODE [NODE ...]) [-i] [-t TCP] [-m [MONITOR]] [-o {csv,json,stdout}] [-f {d,u,k} [{d,u,k} ...]]
 
 options:
   -h, --help            show this help message and exit
@@ -27,6 +27,8 @@ Test Arguments:
 Format Arguments:
   -o {csv,json,stdout}, --output-format {csv,json,stdout}
                         Write results to a file in CSV or JSON.
+  -f {d,u,k} [{d,u,k} ...], --filter {d,u,k} [{d,u,k} ...]
+                        Filter stdout report for dead (d), undead (u), or unknown (k).
 ```
 
 ## Examples
@@ -35,6 +37,7 @@ Scan a single host, and exit.
 nhix@dev-env:~$ undead --node exa01-rta01 --icmp --tcp 80
  hostname         ip_addr          status           icmp_status      tcp_port         tcp_status       errs
  exa01-rta-01     192.168.1.1      undead           success          80               success
+ Displaying 1/1 targets
 ```
 
 Scan three hosts, and exit.
@@ -44,7 +47,7 @@ nhix@dev-env:~$ undead --node exa01-rta-01 exa01-swa-01 exa01-vma-03 --icmp --tc
  exa01-rta-01     192.168.1.1      undead           success          80               success
  exa01-swa-01     192.168.1.10     undead           success          80               failure          Connection refused
  exa01-vma-03     192.168.1.251    dead             failure          80               failure          None
-
+ Displaying 3/3 targets
 ```
 
 Scan a subnet, and exit.
@@ -67,10 +70,37 @@ nhix@dev-env:~$ undead --node 192.168.1.{1..254} -i | head -n 15
  192.168.1.14      192.168.1.14      dead              failure
 ```
 
+Scan a list of hosts, and filter undead.
+```
+nhix@dev-env:~$ undead --host-file host-list --icmp --filter u
+ hostname         ip_addr          status           icmp_status      errs
+ exa01-rta-01     192.168.1.1      undead           success
+ exa01-swa-01     192.168.1.10     undead           success
+ exa01-swa-02     192.168.1.11     undead           success
+ exa01-vma-01     192.168.1.253    undead           success
+ exa01-ssa-01     192.168.0.100    undead           success
+ back-deck-01     192.168.1.223    undead           success
+ Displaying 6/9 targets
+```
+
+Scan a list of hosts, and apply multiple filters.
+```
+ hostname         ip_addr          status           icmp_status      errs
+ exa01-rta-01     192.168.1.1      undead           success
+ xgrmifeabdq      None             unknown          None             -2: Name or service not known
+ exa01-swa-01     192.168.1.10     undead           success
+ exa01-swa-02     192.168.1.11     undead           success
+ exa01-vma-01     192.168.1.253    undead           success
+ exa01-ssa-01     192.168.0.100    undead           success
+ back-deck-01     192.168.1.223    undead           success
+ Displaying 7/9 targets
+```
+
 Scan a list of hosts, and write the results to a file.
 ```
 nhix@dev-env:~$ undead --host-file host-list --icmp --output-format=csv
 ```
+
 ## Known Issues
 undead is still young, so there are quite a few known issues which haven't been addressed yet.
 
@@ -79,6 +109,7 @@ undead is still young, so there are quite a few known issues which haven't been 
    - Text is not formatted to fit the terminal window.
    - Text is colorized, but can overrun the right-most boundary of the table.
    - ~~There is no colorization, or other formatting of the text to visually distinguish dead from undead.~~
+   - Math for the bottom border is incorrect.
 2. ~~TCP ping isn't implemented yet.~~
 3. DNS resolution relies on the host system's DNS facilities, without the ability to specify another DNS server.
 4. Piping to `head` results in a `BrokenPipeError`.
