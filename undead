@@ -312,7 +312,7 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
                 count += 1
 
         msg = f'Displaying {count}/{len(nodes)} targets'
-        line_len = line_len - len(msg)
+        line_len = line_len - len(msg) - 1
 
         # Print the bottom border.
         if mon_mode is False:
@@ -426,7 +426,7 @@ def main():
                 max_len, msg = write_output(nodes, fmt_args, True)
                 countdown = f'Sleeping {args.monitor} seconds…'
                 max_len = max_len - len(countdown)
-                print_fmt(f' {msg}: {countdown}{" " * (max_len - len(countdown) - 5)}', 'back_bold_cyan')
+                print_fmt(f' {msg}: {countdown}{" " * (max_len - len(countdown) - 6)}', 'back_bold_cyan')
                 sleep(args.monitor)
                 clear_screen()
 
