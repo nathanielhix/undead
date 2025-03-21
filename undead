@@ -13,7 +13,7 @@ from os import system as osystem
 from platform import system as psystem
 from shutil import which
 from subprocess import run
-from sys import argv, exit, stderr
+from sys import exit, stderr
 from time import sleep
 from typing import Any, Union
 
@@ -94,6 +94,13 @@ def conf_args():
         default='stdout',
         choices=['csv', 'json', 'stdout'],
         help='Write results to a file in CSV or JSON.'
+    )
+    fmt_args.add_argument(
+        '-f',
+        '--filter',
+        nargs='+',
+        choices=['d', 'u', 'k'],
+        help='Filter stdout report for dead (d), undead (u), or unknown (k).'
     )
 
     return parser.parse_args()
@@ -215,7 +222,7 @@ def check_tcp(node: NetObj, port: int) -> NetObj:
     return node
 
 
-def sus_status(nodes):
+def sus_status(nodes: list) -> list:
     # Determine the dead or undead statuses of nodes.
     for node in nodes:
         if 'success' in [node.icmp_status, node.tcp_status]:
@@ -288,22 +295,30 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
                 results[index] = ' ' + line + ' '
 
         # Print results.
+        count = 0
+
         for index, line in enumerate(results):
             if index == 0:
                 print_fmt(f'{line}', 'back_bold_cyan')
-            elif ' undead' in line:
+            elif ' undead' in line and any([x for x in fmt_args['filter'] if x in ['u', None]]):
                 print_fmt(f'{line}', 'fore_std_green')
-            elif ' dead' in line:
+                count += 1
+            elif ' dead' in line and any([x for x in fmt_args['filter'] if x in ['d', None]]):
                 print_fmt(f'{line}', 'fore_std_red')
-            else:
+                count += 1
+            elif 'unknown' in line and any([x for x in fmt_args['filter'] if x in ['k', None]]):
                 print_fmt(f'{line}', 'fore_std_yellow')
+                count += 1
+
+        msg = f'Displaying {count}/{len(nodes)} targets'
+        line_len = line_len - len(msg)
 
         # Print the bottom border.
         if mon_mode is False:
-            print_fmt(f'{" " * (line_len + 2)}', 'back_bold_cyan')
+            print_fmt(f' {msg}{" " * (line_len + 2)}', 'back_bold_cyan')
         else:
             # Return max line length for monitor mode.
-            return len(max(results, key=len))
+            return len(max(results, key=len)), msg
 
 
 def main():
@@ -347,7 +362,12 @@ def main():
             'errs'
             ],
         'fmt': args.output_format,
+        'filter': None,
     }
+
+    # If a filter has been set, add a rule.
+    if args.filter:
+        fmt_args['filter'] = args.filter
 
     # Dictionary of tests to run.
     tests = {}
@@ -402,9 +422,10 @@ def main():
                 nodes = sus_status(nodes)
 
                 # Sleep and print results.
-                max_len = write_output(nodes, fmt_args, True)
+                max_len, msg = write_output(nodes, fmt_args, True)
                 countdown = f'Sleeping {args.monitor} seconds…'
-                print_fmt(f' {countdown}{" " * (max_len - len(countdown) - 1)}', 'back_bold_cyan')
+                max_len = max_len - len(countdown)
+                print_fmt(f' {msg}: {countdown}{" " * (max_len - len(countdown) - 5)}', 'back_bold_cyan')
                 sleep(args.monitor)
                 clear_screen()
 
