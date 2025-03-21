@@ -100,6 +100,7 @@ def conf_args():
         '--filter',
         nargs='+',
         choices=['d', 'u', 'k'],
+        default=['all'],
         help='Filter stdout report for dead (d), undead (u), or unknown (k).'
     )
 
@@ -300,13 +301,13 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
         for index, line in enumerate(results):
             if index == 0:
                 print_fmt(f'{line}', 'back_bold_cyan')
-            elif ' undead' in line and any([x for x in fmt_args['filter'] if x in ['u', None]]):
+            elif ' undead' in line and any([x for x in fmt_args['filter'] if x in ['u', 'all']]):
                 print_fmt(f'{line}', 'fore_std_green')
                 count += 1
-            elif ' dead' in line and any([x for x in fmt_args['filter'] if x in ['d', None]]):
+            elif ' dead' in line and any([x for x in fmt_args['filter'] if x in ['d', 'all']]):
                 print_fmt(f'{line}', 'fore_std_red')
                 count += 1
-            elif 'unknown' in line and any([x for x in fmt_args['filter'] if x in ['k', None]]):
+            elif 'unknown' in line and any([x for x in fmt_args['filter'] if x in ['k', 'all']]):
                 print_fmt(f'{line}', 'fore_std_yellow')
                 count += 1
 
