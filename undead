@@ -263,21 +263,31 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
     if fmt_args['fmt'].lower() == 'csv':
         f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
 
-        with open(f_name, 'w+') as f:
-            writer = DictWriter(f, fieldnames=fmt_args['headers'])
-            writer.writeheader()
-            writer.writerows(
-                {
-                    k: v for k, v in node.__dict__.items() if k in fmt_args['headers']
-                }
-                for node in nodes
-            )
+        try:
+            with open(f_name, 'w+') as f:
+                writer = DictWriter(f, fieldnames=fmt_args['headers'])
+                writer.writeheader()
+                writer.writerows(
+                    {
+                        k: v for k, v in node.__dict__.items() if k in fmt_args['headers']
+                    }
+                    for node in nodes
+                )
+            print_fmt(f'Wrote {len(nodes)} records to {f_name}', 'info')
+        except Exception as e:
+            print_fmt(f'Failed to write {f_name}: {e.strerror}', 'fatal')
+
     elif fmt_args['fmt'].lower() == 'json':
         f_name = fmt_args['f_name'] + f'.{fmt_args["fmt"]}'
         data = {'hosts': [node.__dict__ for node in nodes]}
 
-        with open(f_name, 'w+') as f:
-            dump(data, f)
+        try:
+            with open(f_name, 'w+') as f:
+                dump(data, f)
+            print_fmt(f'Wrote {len(nodes)} records to {f_name}', 'info')
+        except Exception as e:
+            print_fmt(f'Failed to write {f_name}: {e.strerror}', 'fatal')
+
     else:
         width = len(max([node.hostname for node in nodes], key=len)) + 5
 
