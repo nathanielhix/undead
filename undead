@@ -4,6 +4,7 @@ import socket
 from argparse import ArgumentParser
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from csv import DictWriter
 from datetime import datetime
 from ipaddress import ip_address
@@ -132,7 +133,10 @@ def print_fmt(msg: str, level: str) -> str:
 
 def clear_screen():
     # Clear the screen
-    osystem('cls||clear')
+    if sys_os == 'Windows':
+        osystem('cls')
+    else:
+        osystem('clear')
 
 
 def read_file(file: str) -> list[str]:
@@ -298,28 +302,30 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
         # Print results.
         count = 0
 
-        for index, line in enumerate(results):
-            if index == 0:
-                print_fmt(f'{line}', 'back_bold_cyan')
-            elif ' undead' in line and any([x for x in fmt_args['filter'] if x in ['u', 'all']]):
-                print_fmt(f'{line}', 'fore_std_green')
-                count += 1
-            elif ' dead' in line and any([x for x in fmt_args['filter'] if x in ['d', 'all']]):
-                print_fmt(f'{line}', 'fore_std_red')
-                count += 1
-            elif 'unknown' in line and any([x for x in fmt_args['filter'] if x in ['k', 'all']]):
-                print_fmt(f'{line}', 'fore_std_yellow')
-                count += 1
+        # Handle BrokenPipeError caused when piping to head.
+        with suppress(BrokenPipeError):
+            for index, line in enumerate(results):
+                if index == 0:
+                    print_fmt(f'{line}', 'back_bold_cyan')
+                elif ' undead' in line and any([x for x in fmt_args['filter'] if x in ['u', 'all']]):
+                    print_fmt(f'{line}', 'fore_std_green')
+                    count += 1
+                elif ' dead' in line and any([x for x in fmt_args['filter'] if x in ['d', 'all']]):
+                    print_fmt(f'{line}', 'fore_std_red')
+                    count += 1
+                elif 'unknown' in line and any([x for x in fmt_args['filter'] if x in ['k', 'all']]):
+                    print_fmt(f'{line}', 'fore_std_yellow')
+                    count += 1
 
-        msg = f'Displaying {count}/{len(nodes)} targets'
-        line_len = line_len - len(msg) - 1
+            msg = f'Displaying {count}/{len(nodes)} targets'
+            line_len = line_len - len(msg) - 1
 
-        # Print the bottom border.
-        if mon_mode is False:
-            print_fmt(f' {msg}{" " * (line_len + 2)}', 'back_bold_cyan')
-        else:
-            # Return max line length for monitor mode.
-            return len(max(results, key=len)), msg
+            # Print the bottom border.
+            if mon_mode is False:
+                print_fmt(f' {msg}{" " * (line_len + 2)}', 'back_bold_cyan')
+            else:
+                # Return max line length for monitor mode.
+                return len(max(results, key=len)), msg
 
 
 def main():
