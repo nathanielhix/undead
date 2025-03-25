@@ -107,12 +107,12 @@ undead is still young, so there are quite a few known issues which haven't been 
 ### General
 1. Reports printed to stdout are broken.
    - Text is not formatted to fit the terminal window.
-   - Text is colorized, but can overrun the right-most boundary of the table.
+   - Text can overrun the right-most boundary of the table.
    - ~~There is no colorization, or other formatting of the text to visually distinguish dead from undead.~~
-   - Math for the bottom border is incorrect.
+   - ~~Math for the bottom border is incorrect.~~
 2. ~~TCP ping isn't implemented yet.~~
 3. DNS resolution relies on the host system's DNS facilities, without the ability to specify another DNS server.
-4. Piping to `head` results in a `BrokenPipeError`.
+4. ~~Piping to `head` results in a `BrokenPipeError`.~~
 5. ~~Failing to specify tests results in no tests running, but results written or printed.~~
 
 ### Windows
