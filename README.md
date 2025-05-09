@@ -118,3 +118,7 @@ undead is still young, so there are quite a few known issues which haven't been 
 ### Windows
 1. ~~Text is colored using ANSI escape sequences, which do not display properly.~~
 2. Arguments for ping delay much longer than their *NIX counterparts.
+
+## To Do
+1. Add web UI.
+2. Add rack elevation awareness.
