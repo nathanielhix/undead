@@ -11,6 +11,7 @@ from ipaddress import ip_address
 from json import dump
 from multiprocessing import cpu_count
 from os import system as osystem
+from pathlib import Path
 from platform import system as psystem
 from shutil import which
 from subprocess import run
@@ -64,6 +65,13 @@ def conf_args():
         '--node',
         nargs='+',
         help='A space separate list of DNS-resolvable hostnames.',
+    )
+
+    req_args.add_argument(
+        '-V',
+        '--version',
+        action='store_true',
+        help='Print the version number and exit.'
     )
 
     tst_args.add_argument(
@@ -339,7 +347,17 @@ def write_output(nodes: list, fmt_args: dict, mon_mode: bool) -> int:
 
 
 def main():
+    # Version defined in VERSION.
+    __version__ = Path(__file__).resolve().parent.joinpath("VERSION").read_text().strip()
+
+    # Configure args.
     args = conf_args()
+
+    # Print version and exit.
+    if args.version:
+        print(__version__)
+        exit()
+
     # Do not proceed if no tests specified.
     if not any([args.icmp, args.tcp]):
         print_fmt(
