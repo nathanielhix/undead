@@ -248,7 +248,7 @@ def sus_status(nodes: list) -> list:
     return nodes
 
 
-def process_list(lst: list, func: Callable[...,...], procs: int, *args: Any) -> list:
+def process_list(lst: list, func: Callable[...,Any], procs: int, *args: Any) -> list:
     # Concurrently run a function on a list, using ThreadPoolExecutor.
     with ThreadPoolExecutor(max_workers=procs) as executor:
         if args:
